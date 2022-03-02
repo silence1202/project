@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cstdio>
 #include <cstring>
+#include <windows.h>
 // #define isKeyPressed(nVirtKey) (GetKeyState(nVirtKey) & (1<<(sizeof(SHORT)*8-1))) != 0
 using namespace std;
 const int little_second = 1000;
@@ -16,7 +17,8 @@ int R_routine_y[21] = {17, 16, 15, 14, 13, 12, 11, 11, 11, 12, 13, 13, 13, 14, 1
 int r_routine_x[21] = {8, 8, 8, 8, 8, 8, 8, 7, 6, 6, 6, 5, 4, 4, 4, 5, 5, 5, 6, 7};
 int r_routine_y[21] = {2, 3, 4, 5, 6, 7, 8, 8, 8, 7, 6, 6, 6, 5, 4, 3, 2, 2, 2, 2}; //机器人预设巡逻路线
 int R_aim;
-int r_aim; //当前机器人行进目标
+int r_aim;                                         //当前机器人行进目标
+bool be_stopped[4] = {false, false, false, false}; //判断炸弹爆炸有无被墙阻挡
 void display();
 bool safety(int x, int y);
 void robot_walking();
@@ -77,7 +79,7 @@ public:
         map.node[x][y] = 'O';
         display();
     }
-    bool check(int x, int y)
+    bool check(int x, int y, int i)
     {
         switch (map.node[x][y])
         {
@@ -107,6 +109,10 @@ public:
             *master += 30;
             return true;
             break;
+        case '#':
+            be_stopped[i] = true;
+            return false;
+            break;
         default:
             break;
         }
@@ -116,26 +122,31 @@ public:
     {
         int x = this->location.first;
         int y = this->location.second;
+
         map.node[x][y] = '@';
         for (int i = 1; i <= power; i++)
         {
-            if (check(x - i, y))
+            if (check(x - i, y, 0) && !be_stopped[0])
             {
                 map.node[x - i][y] = 'M';
             }
-            if (check(x + i, y))
+            if (check(x + i, y, 1) && !be_stopped[1])
             {
                 map.node[x + i][y] = 'W';
             }
-            if (check(x, y - i))
+            if (check(x, y - i, 2) && !be_stopped[2])
             {
                 map.node[x][y - i] = '<';
             }
-            if (check(x, y + i))
+            if (check(x, y + i, 3) && !be_stopped[3])
             {
                 map.node[x][y + i] = '>';
             }
         }
+        be_stopped[0] = false;
+        be_stopped[1] = false;
+        be_stopped[2] = false;
+        be_stopped[3] = false;
         display();
         boom_lasting = 1;
     }
