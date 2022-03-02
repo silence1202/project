@@ -7,10 +7,10 @@ using namespace std;
 const int little_second = 1000;
 const int Maxsize = 20;
 int count = 0, boom_count = 0; //计时
-int cd_A, cd_B, cd_A_boom, cd_B_boom, speed_A, speed_B;
-int cd_R, cd_r, cd_R_boom, cd_r_boom, speed_R, speed_r; //前进的冷却cd，放炸弹的冷却cd，行进速度。
-bool A_life, B_life, R_life, r_life;                    //生命
-bool change;                                            //判断人物位置是否有变化
+int cd_A, cd_B, cd_A_boom, cd_B_boom;
+int cd_R, cd_r, cd_R_boom, cd_r_boom; //前进的冷却cd，放炸弹的冷却cd。
+bool A_life, B_life, R_life, r_life;  //生命
+bool change;                          //判断人物位置是否有变化
 int R_routine_x[21] = {1, 1, 1, 1, 1, 1, 1, 2, 3, 3, 3, 4, 5, 5, 5, 4, 4, 4, 3, 2};
 int R_routine_y[21] = {17, 16, 15, 14, 13, 12, 11, 11, 11, 12, 13, 13, 13, 14, 15, 15, 16, 17, 17, 17};
 int r_routine_x[21] = {8, 8, 8, 8, 8, 8, 8, 7, 6, 6, 6, 5, 4, 4, 4, 5, 5, 5, 6, 7};
@@ -25,6 +25,7 @@ class Map
 
 public:
     char node[11][21];
+    char inside[11][21];
     Map()
     {
         strcpy(this->node[0], "####################");
@@ -37,6 +38,17 @@ public:
         strcpy(this->node[7], "#   *# #*** **#   *#");
         strcpy(this->node[8], "## *** **#**#*** **#");
         strcpy(this->node[9], "####################");
+
+        strcpy(this->inside[0], "####################");
+        strcpy(this->inside[1], "#2* 1**#**#2* *1* ##");
+        strcpy(this->inside[2], "#*   #** 1**# #*   #");
+        strcpy(this->inside[3], "#** ##2*#   **### ##");
+        strcpy(this->inside[4], "##*11***### *1#  **#");
+        strcpy(this->inside[5], "#**  #1* ###***11*##");
+        strcpy(this->inside[6], "## ###**   #*2## **#");
+        strcpy(this->inside[7], "#   *# #**1 **#   *#");
+        strcpy(this->inside[8], "## *1* *2#**#**1 *2#");
+        strcpy(this->inside[9], "####################");
     }
 };
 Map map;
@@ -127,21 +139,32 @@ public:
         int x = this->location.first;
         int y = this->location.second;
         map.node[x][y] = ' ';
-        if (map.node[x - 1][y] == 'M')
+        for (int i = 1; i <= power; i++)
         {
-            map.node[x - 1][y] = ' ';
-        }
-        if (map.node[x + 1][y] == 'W')
-        {
-            map.node[x + 1][y] = ' ';
-        }
-        if (map.node[x][y - 1] == '<')
-        {
-            map.node[x][y - 1] = ' ';
-        }
-        if (map.node[x][y + 1] == '>')
-        {
-            map.node[x][y + 1] = ' ';
+            if (map.node[x - i][y] == 'M')
+            {
+                map.node[x - i][y] = ' ';
+                if (map.inside[x - i][y] > '0')
+                    map.node[x - i][y] = map.inside[x - i][y];
+            }
+            if (map.node[x + i][y] == 'W')
+            {
+                map.node[x + i][y] = ' ';
+                if (map.inside[x + i][y] > '0')
+                    map.node[x + i][y] = map.inside[x + i][y];
+            }
+            if (map.node[x][y - i] == '<')
+            {
+                map.node[x][y - i] = ' ';
+                if (map.inside[x][y - i] > '0')
+                    map.node[x][y - i] = map.inside[x][y - i];
+            }
+            if (map.node[x][y + i] == '>')
+            {
+                map.node[x][y + i] = ' ';
+                if (map.inside[x][y + i] > '0')
+                    map.node[x][y + i] = map.inside[x][y + i];
+            }
         }
         display();
     }
@@ -157,7 +180,8 @@ private:
     Bomb bomb;
 
 public:
-    int aim;
+    int aim;   //机器人当前目标
+    int speed; //速度
     // 初 始 化
     Player(int x, int y, char symbol)
     {
@@ -166,6 +190,7 @@ public:
         this->symbol = symbol;
         map.node[x][y] = symbol;
         aim = 0;
+        speed = 5;
     }
 
     // 更 新 位 置
@@ -200,6 +225,16 @@ public:
                 map.node[this->location.first][this->location.second] = ' ';
             this->location.first = x;
             this->location.second = y;
+            if (map.inside[x][y] == '1')
+            {
+                map.inside[x][y] = '0';
+                this->speed--; // speed实为每次行走间隔，实际上的速度应为1/speed
+            }
+            if (map.inside[x][y] == '2')
+            {
+                map.inside[x][y] = '0';
+                this->bomb.power++; //炸弹威力增加
+            }
             map.node[x][y] = this->symbol;
             change = true;
         }
@@ -280,7 +315,7 @@ public:
         int x = cur.first, y = cur.second;
         if (!change && x > x0 && safety(x - 1, y))
         {
-            if (map.node[x - 1][y] == ' ')
+            if (map.node[x - 1][y] == ' ' || (map.node[x - 1][y] > '0' && map.node[x - 1][y] < '9'))
                 this->update_location(1), change = true;
             else if (map.node[x - 1][y] != '#' && !this->bomb_exist())
             {
@@ -293,7 +328,7 @@ public:
 
         if (!change && x < x0 && safety(x + 1, y))
         {
-            if (map.node[x + 1][y] == ' ')
+            if (map.node[x + 1][y] == ' ' || (map.node[x + 1][y] > '0' && map.node[x + 1][y] < '9'))
                 this->update_location(3), change = true;
             else if (map.node[x + 1][y] != '#' && !this->bomb_exist())
             {
@@ -305,7 +340,7 @@ public:
         }
         if (!change && y > y0 && safety(x, y - 1))
         {
-            if (map.node[x][y - 1] == ' ')
+            if (map.node[x][y - 1] == ' ' || (map.node[x][y - 1] > '0' && map.node[x][y - 1] < '9'))
                 this->update_location(2), change = true;
             else if (map.node[x][y - 1] != '#' && !this->bomb_exist())
             {
@@ -317,7 +352,7 @@ public:
         }
         if (!change && y < y0 && safety(x, y + 1))
         {
-            if (map.node[x][y + 1] == ' ')
+            if (map.node[x][y + 1] == ' ' || (map.node[x][y + 1] > '0' && map.node[x][y + 1] < '9'))
                 this->update_location(4), change = true;
             else if (map.node[x][y + 1] != '#' && !this->bomb_exist())
             {
@@ -405,10 +440,6 @@ void init()
     cd_B = 6;
     cd_R = 6;
     cd_r = 6;
-    speed_A = 5;
-    speed_B = 5;
-    speed_R = 5;
-    speed_r = 5;
     cd_A_boom = 56;
     cd_B_boom = 56;
     cd_R_boom = 56;
@@ -435,43 +466,43 @@ void deal_with_input()
         switch (ch)
         {
         case 'w':
-            if (cd_A > speed_A && A_life)
+            if (cd_A > A.speed && A_life)
                 cd_A = 0, A.update_location(1);
             break;
         case 'a':
-            if (cd_A > speed_A && A_life)
+            if (cd_A > A.speed && A_life)
                 cd_A = 0, A.update_location(2);
             break;
         case 's':
-            if (cd_A > speed_A && A_life)
+            if (cd_A > A.speed && A_life)
                 cd_A = 0, A.update_location(3);
             break;
         case 'd':
-            if (cd_A > speed_A && A_life)
+            if (cd_A > A.speed && A_life)
                 cd_A = 0, A.update_location(4);
             break;
         case 'i':
-            if (cd_B > speed_B && B_life)
+            if (cd_B > B.speed && B_life)
                 cd_B = 0, B.update_location(1);
             break;
         case 'j':
-            if (cd_B > speed_B && B_life)
+            if (cd_B > B.speed && B_life)
                 cd_B = 0, B.update_location(2);
             break;
         case 'k':
-            if (cd_B > speed_B && B_life)
+            if (cd_B > B.speed && B_life)
                 cd_B = 0, B.update_location(3);
             break;
         case 'l':
-            if (cd_B > speed_B && B_life)
+            if (cd_B > B.speed && B_life)
                 cd_B = 0, B.update_location(4);
             break;
         case ' ':
-            if (A_life && cd_A_boom > 55 && !A.bomb_exist())
+            if (A_life && cd_A_boom > 0 && !A.bomb_exist())
                 cd_A_boom = 0, A.bomb_placing();
             break;
         case '\r':
-            if (B_life && cd_B_boom > 55 && !B.bomb_exist())
+            if (B_life && cd_B_boom > 0 && !B.bomb_exist())
                 cd_B_boom = 0, B.bomb_placing();
             break;
         default:
@@ -500,12 +531,12 @@ void deal_with_cd() //前进cd与放炸弹cd
     cd_r++;
     cd_R_boom++;
     cd_r_boom++;
-    if (cd_r > speed_r && r_life)
+    if (cd_r > r.speed && r_life)
     {
         cd_r = 0;
         robot_walking();
     }
-    if (cd_R > speed_R && R_life)
+    if (cd_R > R.speed && R_life)
     {
         cd_R = 0;
         Robot_walking();
@@ -524,9 +555,9 @@ int main()
         {
             deal_with_cd();
             count = 0;
-            printf("!");
+            // printf("!");
         }
-        if (boom_count == little_second * 20)
+        if (boom_count == little_second * 15)
         {
             deal_with_timer();
             boom_count = 0;
