@@ -6,12 +6,20 @@
 using namespace std;
 const int little_second = 1000;
 const int Maxsize = 20;
-int count = 0, boom_count = 0;
+int count = 0, boom_count = 0; //计时
 int cd_A, cd_B, cd_A_boom, cd_B_boom, speed_A, speed_B;
-bool A_life, B_life, R_life, r_life;
-bool change;
-
+int cd_R, cd_r, cd_R_boom, cd_r_boom, speed_R, speed_r; //前进的冷却cd，放炸弹的冷却cd，行进速度。
+bool A_life, B_life, R_life, r_life;                    //生命
+bool change;                                            //判断人物位置是否有变化
+int R_routine_x[21] = {1, 1, 1, 1, 1, 1, 1, 2, 3, 3, 3, 4, 5, 5, 5, 4, 4, 4, 3, 2};
+int R_routine_y[21] = {17, 16, 15, 14, 13, 12, 11, 11, 11, 12, 13, 13, 13, 14, 15, 15, 16, 17, 17, 17};
+int r_routine_x[21] = {8, 8, 8, 8, 8, 8, 8, 7, 6, 6, 6, 5, 4, 4, 4, 5, 5, 5, 6, 7};
+int r_routine_y[21] = {2, 3, 4, 5, 6, 7, 8, 8, 8, 7, 6, 6, 6, 5, 4, 3, 2, 2, 2, 2}; //机器人预设巡逻路线
+int R_aim;
+int r_aim; //当前机器人行进目标
 void display();
+bool safety(int x, int y);
+void robot_walking();
 class Map
 {
 
@@ -20,18 +28,22 @@ public:
     Map()
     {
         strcpy(this->node[0], "####################");
-        strcpy(this->node[1], "#** ***#**#****** ##");
-        strcpy(this->node[2], "#*   #******###*   #");
+        strcpy(this->node[1], "#** ***#**#** *** ##");
+        strcpy(this->node[2], "#*   #** ***# #*   #");
         strcpy(this->node[3], "#** ##**#   **### ##");
         strcpy(this->node[4], "##******### **#  **#");
         strcpy(this->node[5], "#**  #** ###******##");
         strcpy(this->node[6], "## ###**   #**## **#");
-        strcpy(this->node[7], "#   *###******#   *#");
-        strcpy(this->node[8], "## ******#**#*** **#");
+        strcpy(this->node[7], "#   *# #*** **#   *#");
+        strcpy(this->node[8], "## *** **#**#*** **#");
         strcpy(this->node[9], "####################");
     }
 };
 Map map;
+bool can_go(int x, int y) //判断能否通过
+{
+    return map.node[x][y] != '*' && map.node[x][y] != '#' && map.node[x][y] != 'O';
+}
 class Bomb
 {
 public:
@@ -46,7 +58,7 @@ public:
     }
     void placing(int x, int y)
     {
-        time_boom = 3;
+        time_boom = 2;
         location.first = x;
         location.second = y;
         map.node[x][y] = 'O';
@@ -88,7 +100,6 @@ public:
         int x = this->location.first;
         int y = this->location.second;
         map.node[x][y] = '@';
-        check(x, y);
         for (int i = 1; i <= power; i++)
         {
             if (check(x - i, y))
@@ -146,6 +157,7 @@ private:
     Bomb bomb;
 
 public:
+    int aim;
     // 初 始 化
     Player(int x, int y, char symbol)
     {
@@ -153,6 +165,7 @@ public:
         this->location.second = y;
         this->symbol = symbol;
         map.node[x][y] = symbol;
+        aim = 0;
     }
 
     // 更 新 位 置
@@ -161,7 +174,7 @@ public:
         int x = this->location.first;
         int y = this->location.second;
         int q = 0;
-        if (map.node[x][y] == 'A' || map.node[x][y] == 'B' || map.node[x][y] == 'R')
+        if (map.node[x][y] == this->symbol)
             q = 1;
         switch (type)
         {
@@ -181,7 +194,7 @@ public:
             break;
         }
         change = false;
-        if (map.node[x][y] == ' ')
+        if (can_go(x, y))
         {
             if (q)
                 map.node[this->location.first][this->location.second] = ' ';
@@ -213,7 +226,20 @@ public:
         {
             bomb.time_boom--;
             if (bomb.time_boom == 0)
+            {
                 bomb.boom();
+                if (this->get_location() == bomb.location)
+                {
+                    if (this->symbol == 'A')
+                        A_life = false;
+                    else if (this->symbol == 'B')
+                        B_life = false;
+                    else if (this->symbol == 'R')
+                        R_life = false;
+                    else if (this->symbol == 'r')
+                        r_life = false;
+                }
+            }
         }
     }
     void bomb_disappear() //炸弹爆炸特效消去
@@ -234,19 +260,163 @@ public:
         else
             return true;
     }
+
+    bool bomb_danger(int x, int y) //判断是否处于炸弹范围内
+    {
+        std::pair<int, int> p = this->bomb.location; //炸弹可能位置
+        if (this->bomb_exist())
+        {
+            if (p.first == x && abs(p.second - y) <= this->bomb.power && map.node[x][(p.second + y) / 2] != '#')
+                return true;
+            if (p.second == y && abs(p.first - x) <= this->bomb.power && map.node[(p.first + x) / 2][y] != '#')
+                return true;
+        }
+        return false;
+    }
+    void aim_to(int x0, int y0) //目标位置
+    {
+        std::pair<int, int> cur = this->get_location();
+        change = false;
+        int x = cur.first, y = cur.second;
+        if (!change && x > x0 && safety(x - 1, y))
+        {
+            if (map.node[x - 1][y] == ' ')
+                this->update_location(1), change = true;
+            else if (map.node[x - 1][y] != '#' && !this->bomb_exist())
+            {
+                this->bomb_placing();
+                robot_walking();
+                aim = (aim + 19) % 20;
+                change = true;
+            }
+        }
+
+        if (!change && x < x0 && safety(x + 1, y))
+        {
+            if (map.node[x + 1][y] == ' ')
+                this->update_location(3), change = true;
+            else if (map.node[x + 1][y] != '#' && !this->bomb_exist())
+            {
+                this->bomb_placing();
+                robot_walking();
+                aim = (aim + 19) % 20;
+                change = true;
+            }
+        }
+        if (!change && y > y0 && safety(x, y - 1))
+        {
+            if (map.node[x][y - 1] == ' ')
+                this->update_location(2), change = true;
+            else if (map.node[x][y - 1] != '#' && !this->bomb_exist())
+            {
+                this->bomb_placing();
+                robot_walking();
+                aim = (aim + 19) % 20;
+                change = true;
+            }
+        }
+        if (!change && y < y0 && safety(x, y + 1))
+        {
+            if (map.node[x][y + 1] == ' ')
+                this->update_location(4), change = true;
+            else if (map.node[x][y + 1] != '#' && !this->bomb_exist())
+            {
+                this->bomb_placing();
+                robot_walking();
+                aim = (aim + 19) % 20;
+                change = true;
+            }
+        }
+        if (!change)
+            map.node[get_location().first][get_location().second] = symbol;
+    }
 };
 Player A(2, 3, 'A');
 Player B(7, 16, 'B');
 Player R(2, 17, 'R');
 Player r(7, 2, 'r');
+
+bool safety(int x, int y) //判断是否安全
+{
+    return !A.bomb_danger(x, y) && !B.bomb_danger(x, y) && !R.bomb_danger(x, y) && !r.bomb_danger(x, y);
+}
+void Robot_walking() // R机器人的行进
+{
+    std::pair<int, int> cur = R.get_location();
+    int x = cur.first, y = cur.second;
+    // printf("%d", safety(x, y));
+    if (!safety(x, y)) //逃
+    {
+        if (can_go(x - 1, y) && (safety(x - 1, y) || map.node[x - 2][y] == ' ' || map.node[x - 1][y - 1] == ' ' || map.node[x - 1][y + 1] == ' '))
+            R.update_location(1); //往上走
+        else if (can_go(x, y - 1) && (safety(x, y - 1) || map.node[x][y - 2] == ' ' || map.node[x - 1][y - 1] == ' ' || map.node[x + 1][y - 1] == ' '))
+            R.update_location(2); //往左走
+        else if (can_go(x + 1, y) && (safety(x + 1, y) || map.node[x + 2][y] == ' ' || map.node[x + 1][y - 1] == ' ' || map.node[x + 1][y + 1] == ' '))
+            R.update_location(3); //往下走
+        else if (can_go(x, y + 1) && (safety(x, y + 1) || map.node[x][y + 2] == ' ' || map.node[x - 1][y + 1] == ' ' || map.node[x + 1][y + 1] == ' '))
+            R.update_location(4); //往右走
+        else
+            R.update_location((rand() % 4) + 1); //随机走
+    }
+    else
+    {
+        if (x == R_routine_x[R.aim] && y == R_routine_y[R.aim])
+        {
+            R.aim = (R.aim + 1) % 20;
+        }
+        int x0 = R_routine_x[R.aim];
+        int y0 = R_routine_y[R.aim];
+        R.aim_to(x0, y0);
+    }
+}
+void robot_walking() // r机器人的行进
+{
+    std::pair<int, int> cur = r.get_location();
+    int x = cur.first, y = cur.second;
+    // printf("%d", safety(x, y));
+    if (!safety(x, y)) //逃
+    {
+        if (can_go(x - 1, y) && (safety(x - 1, y) || map.node[x - 2][y] == ' ' || map.node[x - 1][y - 1] == ' ' || map.node[x - 1][y + 1] == ' '))
+            r.update_location(1); //往上走
+        else if (can_go(x, y - 1) && (safety(x, y - 1) || map.node[x][y - 2] == ' ' || map.node[x - 1][y - 1] == ' ' || map.node[x + 1][y - 1] == ' '))
+            r.update_location(2); //往左走
+        else if (can_go(x + 1, y) && (safety(x + 1, y) || map.node[x + 2][y] == ' ' || map.node[x + 1][y - 1] == ' ' || map.node[x + 1][y + 1] == ' '))
+            r.update_location(3); //往下走
+        else if (can_go(x, y + 1) && (safety(x, y + 1) || map.node[x][y + 2] == ' ' || map.node[x - 1][y + 1] == ' ' || map.node[x + 1][y + 1] == ' '))
+            r.update_location(4); //往右走
+        else
+            r.update_location((rand() % 4) + 1); //随机走
+    }
+    else
+    {
+        if (x == r_routine_x[r.aim] && y == r_routine_y[r.aim])
+        {
+            r.aim = (r.aim + 1) % 20;
+        }
+        int x0 = r_routine_x[r.aim];
+        int y0 = r_routine_y[r.aim];
+        r.aim_to(x0, y0);
+    }
+}
+
 void init()
 {
     cd_A = 6;
     cd_B = 6;
+    cd_R = 6;
+    cd_r = 6;
     speed_A = 5;
     speed_B = 5;
+    speed_R = 5;
+    speed_r = 5;
     cd_A_boom = 56;
     cd_B_boom = 56;
+    cd_R_boom = 56;
+    cd_r_boom = 56;
+    A_life = true;
+    B_life = true;
+    R_life = true;
+    r_life = true;
 }
 void display()
 {
@@ -265,43 +435,43 @@ void deal_with_input()
         switch (ch)
         {
         case 'w':
-            if (cd_A > speed_A)
+            if (cd_A > speed_A && A_life)
                 cd_A = 0, A.update_location(1);
             break;
         case 'a':
-            if (cd_A > speed_A)
+            if (cd_A > speed_A && A_life)
                 cd_A = 0, A.update_location(2);
             break;
         case 's':
-            if (cd_A > speed_A)
+            if (cd_A > speed_A && A_life)
                 cd_A = 0, A.update_location(3);
             break;
         case 'd':
-            if (cd_A > speed_A)
+            if (cd_A > speed_A && A_life)
                 cd_A = 0, A.update_location(4);
             break;
         case 'i':
-            if (cd_B > speed_B)
+            if (cd_B > speed_B && B_life)
                 cd_B = 0, B.update_location(1);
             break;
         case 'j':
-            if (cd_B > speed_B)
+            if (cd_B > speed_B && B_life)
                 cd_B = 0, B.update_location(2);
             break;
         case 'k':
-            if (cd_B > speed_B)
+            if (cd_B > speed_B && B_life)
                 cd_B = 0, B.update_location(3);
             break;
         case 'l':
-            if (cd_B > speed_B)
+            if (cd_B > speed_B && B_life)
                 cd_B = 0, B.update_location(4);
             break;
         case ' ':
-            if (cd_A_boom > 55 && !A.bomb_exist())
+            if (A_life && cd_A_boom > 55 && !A.bomb_exist())
                 cd_A_boom = 0, A.bomb_placing();
             break;
         case '\r':
-            if (cd_B_boom > 55 && !B.bomb_exist())
+            if (B_life && cd_B_boom > 55 && !B.bomb_exist())
                 cd_B_boom = 0, B.bomb_placing();
             break;
         default:
@@ -309,7 +479,7 @@ void deal_with_input()
         }
     }
 }
-void deal_with_timer()
+void deal_with_timer() //炸弹时间
 {
     A.bomb_booming();
     A.bomb_disappear();
@@ -319,6 +489,27 @@ void deal_with_timer()
     R.bomb_disappear();
     r.bomb_booming();
     r.bomb_disappear();
+}
+void deal_with_cd() //前进cd与放炸弹cd
+{
+    cd_A++;
+    cd_B++;
+    cd_A_boom++;
+    cd_B_boom++;
+    cd_R++;
+    cd_r++;
+    cd_R_boom++;
+    cd_r_boom++;
+    if (cd_r > speed_r && r_life)
+    {
+        cd_r = 0;
+        robot_walking();
+    }
+    if (cd_R > speed_R && R_life)
+    {
+        cd_R = 0;
+        Robot_walking();
+    }
 }
 int main()
 {
@@ -331,10 +522,7 @@ int main()
         boom_count++;
         if (count == little_second)
         {
-            cd_A++;
-            cd_B++;
-            cd_A_boom++;
-            cd_B_boom++;
+            deal_with_cd();
             count = 0;
             printf("!");
         }
