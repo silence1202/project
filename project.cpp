@@ -63,6 +63,7 @@ public:
     std::pair<int, int> location;
     int time_boom;
     int boom_lasting;
+    int *master;
     Bomb()
     {
         time_boom = 0;
@@ -82,24 +83,28 @@ public:
         {
         case 'A':
             A_life = false;
+            *master += 3000;
             return true;
-            break;
         case 'B':
             B_life = false;
+            *master += 3000;
             return true;
             break;
         case 'R':
             R_life = false;
+            *master += 3000;
             return true;
             break;
         case 'r':
             r_life = false;
+            *master += 3000;
             return true;
             break;
         case ' ':
             return true;
             break;
         case '*':
+            *master += 30;
             return true;
             break;
         default:
@@ -182,6 +187,7 @@ private:
 public:
     int aim;   //机器人当前目标
     int speed; //速度
+    int score; //分数
     // 初 始 化
     Player(int x, int y, char symbol)
     {
@@ -191,6 +197,7 @@ public:
         map.node[x][y] = symbol;
         aim = 0;
         speed = 5;
+        score = 0;
     }
 
     // 更 新 位 置
@@ -228,11 +235,13 @@ public:
             if (map.inside[x][y] == '1')
             {
                 map.inside[x][y] = '0';
+                score += 100;
                 this->speed--; // speed实为每次行走间隔，实际上的速度应为1/speed
             }
             if (map.inside[x][y] == '2')
             {
                 map.inside[x][y] = '0';
+                score += 100;
                 this->bomb.power++; //炸弹威力增加
             }
             map.node[x][y] = this->symbol;
@@ -253,6 +262,7 @@ public:
     {
         std::pair<int, int> p = get_location();
         bomb.placing(p.first, p.second);
+        bomb.master = &score;
     }
     //炸弹倒计时
     void bomb_booming() //炸弹爆炸
@@ -456,6 +466,17 @@ void display()
     {
         puts(map.node[i]);
     }
+    if (A_life == false)
+        A.score = 0;
+    if (B_life == false)
+        B.score = 0;
+    if (R_life == false)
+        R.score = 0;
+    if (r_life == false)
+        r.score = 0;
+    printf("     --------SCORE--------\n");
+    printf("Player A : %04d |Player B : %04d\n", A.score, B.score);
+    printf("Robot R  : %04d |Robot r  : %04d", R.score, r.score);
 }
 void deal_with_input()
 {
