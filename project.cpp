@@ -73,7 +73,7 @@ public:
     }
     void placing(int x, int y)
     {
-        time_boom = 2;
+        time_boom = 3;
         location.first = x;
         location.second = y;
         map.node[x][y] = 'O';
@@ -207,7 +207,7 @@ public:
         this->symbol = symbol;
         map.node[x][y] = symbol;
         aim = 0;
-        speed = 5;
+        speed = 10;
         score = 0;
     }
 
@@ -259,8 +259,8 @@ public:
             change = true;
         }
 
-        if (change)
-            display();
+        // if (change)
+        // display();
     }
 
     // 获 取 位 置
@@ -499,35 +499,35 @@ void deal_with_input()
         {
         case 'w':
             if (cd_A > A.speed && A_life)
-                cd_A = 0, A.update_location(1);
+                cd_A = 0, A.update_location(1), display();
             break;
         case 'a':
             if (cd_A > A.speed && A_life)
-                cd_A = 0, A.update_location(2);
+                cd_A = 0, A.update_location(2), display();
             break;
         case 's':
             if (cd_A > A.speed && A_life)
-                cd_A = 0, A.update_location(3);
+                cd_A = 0, A.update_location(3), display();
             break;
         case 'd':
             if (cd_A > A.speed && A_life)
-                cd_A = 0, A.update_location(4);
+                cd_A = 0, A.update_location(4), display();
             break;
         case 'i':
             if (cd_B > B.speed && B_life)
-                cd_B = 0, B.update_location(1);
+                cd_B = 0, B.update_location(1), display();
             break;
         case 'j':
             if (cd_B > B.speed && B_life)
-                cd_B = 0, B.update_location(2);
+                cd_B = 0, B.update_location(2), display();
             break;
         case 'k':
             if (cd_B > B.speed && B_life)
-                cd_B = 0, B.update_location(3);
+                cd_B = 0, B.update_location(3), display();
             break;
         case 'l':
             if (cd_B > B.speed && B_life)
-                cd_B = 0, B.update_location(4);
+                cd_B = 0, B.update_location(4), display();
             break;
         case ' ':
             if (A_life && cd_A_boom > 0 && !A.bomb_exist())
@@ -573,6 +573,8 @@ void deal_with_cd() //前进cd与放炸弹cd
         cd_R = 0;
         Robot_walking();
     }
+    if (cd_r * cd_R == 0)
+        display();
 }
 int main()
 {
@@ -589,7 +591,7 @@ int main()
             count = 0;
             // printf("!");
         }
-        if (boom_count == little_second * 15)
+        if (boom_count == little_second * 20)
         {
             deal_with_timer();
             boom_count = 0;
