@@ -19,6 +19,7 @@ int r_routine_y[21] = {2, 3, 4, 5, 6, 7, 8, 8, 8, 7, 6, 6, 6, 5, 4, 3, 2, 2, 2, 
 int R_aim;
 int r_aim;                                         //当前机器人行进目标
 bool be_stopped[4] = {false, false, false, false}; //判断炸弹爆炸有无被墙阻挡
+bool over;                                         //判断游戏是否结束
 void display();
 bool safety(int x, int y);
 void robot_walking();
@@ -126,19 +127,19 @@ public:
         map.node[x][y] = '@';
         for (int i = 1; i <= power; i++)
         {
-            if (check(x - i, y, 0) && !be_stopped[0])
+            if (!be_stopped[0] && check(x - i, y, 0))
             {
                 map.node[x - i][y] = 'M';
             }
-            if (check(x + i, y, 1) && !be_stopped[1])
+            if (!be_stopped[1] && check(x + i, y, 1))
             {
                 map.node[x + i][y] = 'W';
             }
-            if (check(x, y - i, 2) && !be_stopped[2])
+            if (!be_stopped[2] && check(x, y - i, 2))
             {
                 map.node[x][y - i] = '<';
             }
-            if (check(x, y + i, 3) && !be_stopped[3])
+            if (!be_stopped[3] && check(x, y + i, 3))
             {
                 map.node[x][y + i] = '>';
             }
@@ -469,10 +470,25 @@ void init()
     B_life = true;
     R_life = true;
     r_life = true;
+    over = false;
 }
 void display()
 {
     system("cls");
+    if (!r_life && !R_life)
+    {
+        over = true;
+        strcpy(map.node[3], "/~~~~~~~~~~~~~~~~~~\\");
+        strcpy(map.node[4], "|~~>>>YOU WIN!<<<~~|");
+        strcpy(map.node[5], "\\~~~~~~~~~~~~~~~~~~/");
+    }
+    else if (!A_life && !B_life)
+    {
+        over = true;
+        strcpy(map.node[3], "/==================\\");
+        strcpy(map.node[4], "|--<<<YOU LOSE>>>--|");
+        strcpy(map.node[5], "\\==================/");
+    }
     for (int i = 0; i < 10; i++)
     {
         puts(map.node[i]);
@@ -596,7 +612,8 @@ int main()
             deal_with_timer();
             boom_count = 0;
         }
+        if (over)
+            break;
     }
-
     return 0;
 }
