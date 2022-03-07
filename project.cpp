@@ -9,7 +9,7 @@ const int little_second = 1000;
 const int Maxsize = 20;
 int count = 0, boom_count = 0; //计时
 int cd_A, cd_B, cd_A_boom, cd_B_boom;
-int cd_R, cd_r, cd_R_boom, cd_r_boom; //前进的冷却cd，放炸弹的冷却cd。
+int cd_R, cd_r, cd_R_boom, cd_r_boom; //前进的冷却cd，放炸弹的冷却cd。随count每次自增一，直到超过预设冷却时间，保证了每两次行进或放炸弹之间的时间间隔下限
 bool A_life, B_life, R_life, r_life;  //生命
 bool change;                          //判断人物位置是否有变化
 int R_routine_x[21] = {1, 1, 1, 1, 1, 1, 1, 2, 3, 3, 3, 4, 5, 5, 5, 4, 4, 4, 3, 2};
@@ -17,7 +17,7 @@ int R_routine_y[21] = {17, 16, 15, 14, 13, 12, 11, 11, 11, 12, 13, 13, 13, 14, 1
 int r_routine_x[21] = {8, 8, 8, 8, 8, 8, 8, 7, 6, 6, 6, 5, 4, 4, 4, 5, 5, 5, 6, 7};
 int r_routine_y[21] = {2, 3, 4, 5, 6, 7, 8, 8, 8, 7, 6, 6, 6, 5, 4, 3, 2, 2, 2, 2}; //机器人预设巡逻路线
 int R_aim;
-int r_aim;                                         //当前机器人行进目标
+int r_aim;                                         //当前机器人行进目标，指向路线数组下标
 bool be_stopped[4] = {false, false, false, false}; //判断炸弹爆炸有无被墙阻挡
 bool over;                                         //判断游戏是否结束
 void display();
@@ -30,7 +30,7 @@ public:
     char node[11][21];
     char inside[11][21];
     Map()
-    {
+    { //地图
         strcpy(this->node[0], "####################");
         strcpy(this->node[1], "#** ***#**#** *** ##");
         strcpy(this->node[2], "#*   #** ***# #*   #");
@@ -41,7 +41,7 @@ public:
         strcpy(this->node[7], "#   *# #*** **#   *#");
         strcpy(this->node[8], "## *** **#**#*** **#");
         strcpy(this->node[9], "####################");
-
+        //地图软墙内部道具
         strcpy(this->inside[0], "####################");
         strcpy(this->inside[1], "#2* 1**#**#2* *1* ##");
         strcpy(this->inside[2], "#*   #** 1**# #*   #");
@@ -60,19 +60,19 @@ bool can_go(int x, int y) //判断能否通过
     return map.node[x][y] != '*' && map.node[x][y] != '#' && map.node[x][y] != 'O';
 }
 class Bomb
-{
+{ //炸弹
 public:
-    int power;
-    std::pair<int, int> location;
-    int time_boom;
-    int boom_lasting;
-    int *master;
+    int power;                    //炸弹威力
+    std::pair<int, int> location; //位置
+    int time_boom;                //爆炸剩余时间
+    int boom_lasting;             //爆炸特效持续时间
+    int *master;                  //炸弹的放置者
     Bomb()
     {
         time_boom = 0;
         power = 1;
     }
-    void placing(int x, int y)
+    void placing(int x, int y) //放置炸弹
     {
         time_boom = 3;
         location.first = x;
@@ -80,7 +80,7 @@ public:
         map.node[x][y] = 'O';
         display();
     }
-    bool check(int x, int y, int i)
+    bool check(int x, int y, int i) //查看炸弹爆炸波及情况
     {
         switch (map.node[x][y])
         {
@@ -119,7 +119,7 @@ public:
         }
         return false;
     }
-    void boom()
+    void boom() //爆炸
     {
         int x = this->location.first;
         int y = this->location.second;
@@ -151,7 +151,7 @@ public:
         display();
         boom_lasting = 1;
     }
-    void disappear()
+    void disappear() //爆炸特效散去
     {
         int x = this->location.first;
         int y = this->location.second;
@@ -248,7 +248,7 @@ public:
             {
                 map.inside[x][y] = '0';
                 score += 100;
-                this->speed--; // speed实为每次行走间隔，实际上的速度应为1/speed
+                this->speed--; // speed实为每次行走间隔下限，实际上的速度应为1/speed
             }
             if (map.inside[x][y] == '2')
             {
@@ -308,7 +308,7 @@ public:
                 bomb.disappear();
         }
     }
-    bool bomb_exist() //炸弹存在
+    bool bomb_exist() //判断炸弹存在
     {
         if (bomb.boom_lasting == 0 && bomb.time_boom == 0)
         {
@@ -330,11 +330,12 @@ public:
         }
         return false;
     }
-    void aim_to(int x0, int y0) //目标位置
+    void aim_to(int x0, int y0) //机器人目标位置
     {
         std::pair<int, int> cur = this->get_location();
         change = false;
         int x = cur.first, y = cur.second;
+        //可行进且是向着自己的目标前进，则前进，若是软墙或者人，则放置炸弹
         if (!change && x > x0 && safety(x - 1, y))
         {
             if (map.node[x - 1][y] == ' ' || (map.node[x - 1][y] > '0' && map.node[x - 1][y] < '9'))
@@ -384,7 +385,8 @@ public:
                 change = true;
             }
         }
-        if (!change)
+        //若不动，刷新位置防止显示错误
+        if (!change && score)
             map.node[get_location().first][get_location().second] = symbol;
     }
 };
@@ -402,7 +404,7 @@ void Robot_walking() // R机器人的行进
     std::pair<int, int> cur = R.get_location();
     int x = cur.first, y = cur.second;
     // printf("%d", safety(x, y));
-    if (!safety(x, y)) //逃
+    if (!safety(x, y)) //不安全->逃
     {
         if (can_go(x - 1, y) && (safety(x - 1, y) || map.node[x - 2][y] == ' ' || map.node[x - 1][y - 1] == ' ' || map.node[x - 1][y + 1] == ' '))
             R.update_location(1); //往上走
@@ -415,7 +417,7 @@ void Robot_walking() // R机器人的行进
         else
             R.update_location((rand() % 4) + 1); //随机走
     }
-    else
+    else //安全->向着目标行进
     {
         if (x == R_routine_x[R.aim] && y == R_routine_y[R.aim])
         {
@@ -601,13 +603,13 @@ int main()
         deal_with_input();
         count++;
         boom_count++;
-        if (count == little_second)
+        if (count == little_second) //大致0.1s一次
         {
             deal_with_cd();
             count = 0;
             // printf("!");
         }
-        if (boom_count == little_second * 20)
+        if (boom_count == little_second * 20) //大致两秒一次
         {
             deal_with_timer();
             boom_count = 0;
