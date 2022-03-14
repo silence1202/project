@@ -88,6 +88,7 @@ public:
             A_life = false;
             *master += 3000;
             return true;
+            break;
         case 'B':
             B_life = false;
             *master += 3000;
@@ -330,7 +331,7 @@ public:
         }
         return false;
     }
-    void aim_to(int x0, int y0) //机器人目标位置
+    bool aim_to(int x0, int y0) //机器人目标位置
     {
         std::pair<int, int> cur = this->get_location();
         change = false;
@@ -385,9 +386,7 @@ public:
                 change = true;
             }
         }
-        //若不动，刷新位置防止显示错误
-        if (!change && score)
-            map.node[get_location().first][get_location().second] = symbol;
+        return change;
     }
 };
 Player A(2, 3, 'A');
@@ -401,6 +400,9 @@ bool safety(int x, int y) //判断是否安全
 }
 void Robot_walking() // R机器人的行进
 {
+    if (!R_life)
+        return;
+    cd_R = 0;
     std::pair<int, int> cur = R.get_location();
     int x = cur.first, y = cur.second;
     // printf("%d", safety(x, y));
@@ -425,11 +427,16 @@ void Robot_walking() // R机器人的行进
         }
         int x0 = R_routine_x[R.aim];
         int y0 = R_routine_y[R.aim];
-        R.aim_to(x0, y0);
+        //行进后刷新位置防止显示错误
+        if (R_life && !R.aim_to(x0, y0))
+            map.node[R.get_location().first][R.get_location().second] = 'R';
     }
 }
 void robot_walking() // r机器人的行进
 {
+    if (!r_life)
+        return;
+    cd_r = 0;
     std::pair<int, int> cur = r.get_location();
     int x = cur.first, y = cur.second;
     // printf("%d", safety(x, y));
@@ -454,7 +461,9 @@ void robot_walking() // r机器人的行进
         }
         int x0 = r_routine_x[r.aim];
         int y0 = r_routine_y[r.aim];
-        r.aim_to(x0, y0);
+        //行进后刷新位置防止显示错误
+        if (r_life && !r.aim_to(x0, y0))
+            map.node[r.get_location().first][r.get_location().second] = 'r';
     }
 }
 
@@ -581,14 +590,12 @@ void deal_with_cd() //前进cd与放炸弹cd
     cd_r++;
     cd_R_boom++;
     cd_r_boom++;
-    if (cd_r > r.speed && r_life)
+    if (r_life && cd_r > r.speed)
     {
-        cd_r = 0;
         robot_walking();
     }
-    if (cd_R > R.speed && R_life)
+    if (R_life && cd_R > R.speed)
     {
-        cd_R = 0;
         Robot_walking();
     }
     if (cd_r * cd_R == 0)
